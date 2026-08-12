@@ -17,7 +17,12 @@ import { prisma } from './db/prisma';
 const app: Express = express();
 
 // --- Security & Parsing Middlewares ---
-app.use(cors({ origin: env.CORS_ORIGIN, credentials: true }));
+app.use(cors({
+  origin: (origin, callback) => {
+    callback(null, true);
+  },
+  credentials: true
+}));
 app.use(express.json({ limit: '1mb' }));           // Body size limit
 app.use(express.urlencoded({ extended: true, limit: '1mb' }));
 app.use(morgan('dev'));
