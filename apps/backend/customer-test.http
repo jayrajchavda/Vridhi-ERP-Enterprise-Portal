@@ -1,0 +1,50 @@
+### 1. List Customers (Paginated, Searchable, Filterable)
+GET http://localhost:5000/api/v1/customers?page=1&limit=10&status=LEAD&sortBy=createdAt&order=desc
+Authorization: Bearer <TOKEN>
+
+### 2. Search Customers by Keyword (matches name, mobile, businessName, email)
+GET http://localhost:5000/api/v1/customers?q=Apex
+Authorization: Bearer <TOKEN>
+
+### 3. Create New Customer
+POST http://localhost:5000/api/v1/customers
+Authorization: Bearer <TOKEN>
+Content-Type: application/json
+
+{
+  "name": "Zenith Enterprises",
+  "mobile": "+919988776655",
+  "email": "contact@zenith.com",
+  "businessName": "Zenith Corp Pvt Ltd",
+  "gstNumber": "27ZZZZZ9999Z9Z9",
+  "customerType": "DISTRIBUTOR",
+  "address": "404 Tech Park, Pune, MH",
+  "status": "LEAD"
+}
+
+### 4. Get Customer Detail
+GET http://localhost:5000/api/v1/customers/<CUSTOMER_ID>
+Authorization: Bearer <TOKEN>
+
+### 5. Update Customer (PATCH)
+PATCH http://localhost:5000/api/v1/customers/<CUSTOMER_ID>
+Authorization: Bearer <TOKEN>
+Content-Type: application/json
+
+{
+  "status": "ACTIVE",
+  "email": "updated@zenith.com"
+}
+
+### 6. Add Follow-Up Note to Customer
+POST http://localhost:5000/api/v1/customers/<CUSTOMER_ID>/notes
+Authorization: Bearer <TOKEN>
+Content-Type: application/json
+
+{
+  "note": "Discussed bulk ordering discounts over phone call. Customer agreed to place trial order next week."
+}
+
+### 7. Get All Notes for Customer
+GET http://localhost:5000/api/v1/customers/<CUSTOMER_ID>/notes
+Authorization: Bearer <TOKEN>

@@ -1,0 +1,308 @@
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+model User {
+  id           String   @id @default(uuid())
+  name         String
+  email        String   @unique
+  passwordHash String
+  role         String   // ADMIN, SALES, WAREHOUSE, ACCOUNTS
+  isActive     Boolean  @default(true)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  createdCustomers      Customer[]      @relation("UserCreatedCustomers")
+  createdNotes          FollowUpNote[]  @relation("UserCreatedNotes")
+  createdStockMovements StockMovement[] @relation("UserCreatedStockMovements")
+  createdChallans       SalesChallan[]  @relation("UserCreatedChallans")
+
+  // Additive back-relations
+  createdPurchaseOrders    PurchaseOrder[]       @relation("UserCreatedPurchaseOrders")
+  receivedPurchaseReceipts PurchaseReceipt[]     @relation("UserReceivedPurchaseReceipts")
+  createdInvoices          Invoice[]             @relation("UserCreatedInvoices")
+  recordedPayments         Payment[]             @relation("UserRecordedPayments")
+  createdInteractions      CustomerInteraction[] @relation("UserCreatedInteractions")
+
+  @@map("users")
+}
+
+model Customer {
+  id           String    @id @default(uuid())
+  name         String
+  mobile       String    @unique
+  email        String?
+  businessName String?
+  gstNumber    String?
+  customerType String    // RETAIL, WHOLESALE, DISTRIBUTOR
+  address      String?
+  status       String    @default("LEAD") // LEAD, ACTIVE, INACTIVE
+  followUpDate DateTime?
+  createdById  String
+  createdBy    User      @relation("UserCreatedCustomers", fields: [createdById], references: [id])
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+
+  followUpNotes FollowUpNote[]
+  challans      SalesChallan[]
+
+  // Additive fields & relations
+  state        String?
+  invoices     Invoice[]
+  interactions CustomerInteraction[]
+
+  @@index([mobile])
+  @@index([status])
+  @@map("customers")
+}
+
+model FollowUpNote {
+  id          String   @id @default(uuid())
+  customerId  String
+  customer    Customer @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  note        String
+  createdById String
+  createdBy   User     @relation("UserCreatedNotes", fields: [createdById], references: [id])
+  createdAt   DateTime @default(now())
+
+  @@index([customerId])
+  @@map("follow_up_notes")
+}
+
+model Product {
+  id            String   @id @default(uuid())
+  name          String
+  sku           String   @unique
+  category      String
+  unitPrice     Decimal
+  currentStock  Int      @default(0)
+  minStockAlert Int      @default(0)
+  location      String?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  stockMovements StockMovement[]
+  challanItems   ChallanItem[]
+
+  // Additive fields & relations
+  gstRate      Decimal?
+  poItems      PurchaseOrderItem[]
+  receiptItems PurchaseReceiptItem[]
+
+  @@index([sku])
+  @@map("products")
+}
+
+model StockMovement {
+  id                 String        @id @default(uuid())
+  productId          String
+  product            Product       @relation(fields: [productId], references: [id], onDelete: Restrict)
+  quantityChanged    Int
+  movementType       String        // IN, OUT
+  reason             String
+  createdById        String
+  createdBy          User          @relation("UserCreatedStockMovements", fields: [createdById], references: [id])
+  createdAt          DateTime      @default(now())
+  referenceChallanId String?
+  referenceChallan   SalesChallan? @relation(fields: [referenceChallanId], references: [id], onDelete: SetNull)
+
+  // Additive fields & relations
+  referencePurchaseReceiptId String?
+  referencePurchaseReceipt   PurchaseReceipt? @relation(fields: [referencePurchaseReceiptId], references: [id], onDelete: SetNull)
+
+  @@index([productId])
+  @@index([referenceChallanId])
+  @@index([referencePurchaseReceiptId])
+  @@map("stock_movements")
+}
+
+model SalesChallan {
+  id            String   @id @default(uuid())
+  challanNumber String   @unique
+  customerId    String
+  customer      Customer @relation(fields: [customerId], references: [id], onDelete: Restrict)
+  status        String   @default("DRAFT") // DRAFT, CONFIRMED, CANCELLED
+  totalQuantity Int
+  totalAmount   Decimal
+  createdById   String
+  createdBy     User     @relation("UserCreatedChallans", fields: [createdById], references: [id])
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  items          ChallanItem[]
+  stockMovements StockMovement[]
+
+  // Additive relations
+  invoice        Invoice?
+
+  @@index([status])
+  @@index([customerId])
+  @@map("sales_challans")
+}
+
+model ChallanItem {
+  id                  String       @id @default(uuid())
+  challanId           String
+  challan             SalesChallan @relation(fields: [challanId], references: [id], onDelete: Cascade)
+  productId           String
+  product             Product      @relation(fields: [productId], references: [id], onDelete: Restrict)
+  productNameSnapshot String
+  skuSnapshot         String
+  unitPriceSnapshot   Decimal
+  quantity            Int
+  lineTotal           Decimal
+
+  @@index([challanId])
+  @@index([productId])
+  @@map("challan_items")
+}
+
+// Additive Models for Procurement, Invoicing and Communications
+
+model Vendor {
+  id            String   @id @default(uuid())
+  name          String
+  contactPerson String?
+  phone         String
+  email         String?
+  gstNumber     String?
+  address       String?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  purchaseOrders   PurchaseOrder[]
+  purchaseReceipts PurchaseReceipt[]
+
+  @@index([name])
+  @@map("vendors")
+}
+
+model PurchaseOrder {
+  id          String   @id @default(uuid())
+  poNumber    String   @unique
+  vendorId    String
+  vendor      Vendor   @relation(fields: [vendorId], references: [id], onDelete: Restrict)
+  status      String   @default("DRAFT") // DRAFT, SENT, RECEIVED, CANCELLED
+  createdById String
+  createdBy   User     @relation("UserCreatedPurchaseOrders", fields: [createdById], references: [id])
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  items    PurchaseOrderItem[]
+  receipts PurchaseReceipt[]
+
+  @@index([status])
+  @@map("purchase_orders")
+}
+
+model PurchaseOrderItem {
+  id                  String        @id @default(uuid())
+  poId                String
+  po                  PurchaseOrder @relation(fields: [poId], references: [id], onDelete: Cascade)
+  productId           String
+  product             Product       @relation(fields: [productId], references: [id], onDelete: Restrict)
+  productNameSnapshot String
+  skuSnapshot         String
+  quantityOrdered     Int
+  unitCost            Decimal
+
+  @@map("purchase_order_items")
+}
+
+model PurchaseReceipt {
+  id           String         @id @default(uuid())
+  poId         String?
+  po           PurchaseOrder? @relation(fields: [poId], references: [id], onDelete: SetNull)
+  vendorId     String
+  vendor       Vendor         @relation(fields: [vendorId], references: [id], onDelete: Restrict)
+  receivedById String
+  receivedBy   User           @relation("UserReceivedPurchaseReceipts", fields: [receivedById], references: [id])
+  createdAt    DateTime       @default(now())
+
+  items          PurchaseReceiptItem[]
+  stockMovements StockMovement[]
+
+  @@map("purchase_receipts")
+}
+
+model PurchaseReceiptItem {
+  id               String          @id @default(uuid())
+  receiptId        String
+  receipt          PurchaseReceipt @relation(fields: [receiptId], references: [id], onDelete: Cascade)
+  productId        String
+  product          Product         @relation(fields: [productId], references: [id], onDelete: Restrict)
+  quantityReceived Int
+  unitCost         Decimal
+
+  @@map("purchase_receipt_items")
+}
+
+model Invoice {
+  id            String       @id @default(uuid())
+  invoiceNumber String       @unique
+  challanId     String       @unique
+  challan       SalesChallan @relation(fields: [challanId], references: [id], onDelete: Restrict)
+  customerId    String
+  customer      Customer     @relation(fields: [customerId], references: [id], onDelete: Restrict)
+  subtotal      Decimal
+  cgstAmount    Decimal
+  sgstAmount    Decimal
+  igstAmount    Decimal
+  totalAmount   Decimal
+  status        String       @default("UNPAID") // UNPAID, PARTIALLY_PAID, PAID
+  createdById   String
+  createdBy     User         @relation("UserCreatedInvoices", fields: [createdById], references: [id])
+  createdAt     DateTime     @default(now())
+  updatedAt     DateTime     @updatedAt
+
+  payments Payment[]
+
+  @@index([status])
+  @@map("invoices")
+}
+
+model Payment {
+  id           String   @id @default(uuid())
+  invoiceId    String
+  invoice      Invoice  @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+  amount       Decimal
+  method       String   // UPI, BANK_TRANSFER, CASH
+  paidAt       DateTime
+  recordedById String
+  recordedBy   User     @relation("UserRecordedPayments", fields: [recordedById], references: [id])
+  createdAt    DateTime @default(now())
+
+  @@map("payments")
+}
+
+model CustomerInteraction {
+  id          String   @id @default(uuid())
+  customerId  String
+  customer    Customer @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  type        String   // CALL, EMAIL, MEETING
+  notes       String
+  createdById String
+  createdBy   User     @relation("UserCreatedInteractions", fields: [createdById], references: [id])
+  createdAt   DateTime @default(now())
+
+  @@index([customerId, createdAt])
+  @@map("customer_interactions")
+}
+
+model EmailLog {
+  id             String   @id @default(uuid())
+  recipientEmail String
+  subject        String
+  relatedType    String   // CHALLAN, INVOICE, PO
+  relatedId      String
+  status         String   // SENT, FAILED
+  errorMessage   String?
+  createdAt      DateTime @default(now())
+
+  @@map("email_logs")
+}

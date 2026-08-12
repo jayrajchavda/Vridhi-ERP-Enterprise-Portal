@@ -1,0 +1,444 @@
+openapi: 3.0.3
+info:
+  title: Mini ERP + CRM Operations Portal API
+  description: |
+    Backend REST API for the Mini ERP + CRM system.
+    Supports Customer CRM, Product Inventory, Sales Challans, and Role-Based Access Control.
+  version: 1.0.0
+
+servers:
+  - url: http://localhost:5000/api/v1
+    description: Local development
+  - url: https://your-production-url.com/api/v1
+    description: Production
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+
+  schemas:
+    SuccessResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+          example: true
+        data:
+          type: object
+        meta:
+          type: object
+
+    ErrorResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+          example: false
+        error:
+          type: object
+          properties:
+            code:
+              type: string
+            message:
+              type: string
+            details:
+              type: array
+
+    User:
+      type: object
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        email:
+          type: string
+        role:
+          type: string
+          enum: [ADMIN, SALES, WAREHOUSE, ACCOUNTS]
+
+    Customer:
+      type: object
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        mobile:
+          type: string
+        email:
+          type: string
+        businessName:
+          type: string
+        gstNumber:
+          type: string
+        customerType:
+          type: string
+          enum: [RETAIL, WHOLESALE, DISTRIBUTOR]
+        status:
+          type: string
+          enum: [LEAD, ACTIVE, INACTIVE]
+        followUpDate:
+          type: string
+          format: date-time
+
+    Product:
+      type: object
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        sku:
+          type: string
+        category:
+          type: string
+        unitPrice:
+          type: string
+          description: Decimal value as string for precision
+        currentStock:
+          type: integer
+        minStockAlert:
+          type: integer
+        location:
+          type: string
+
+    SalesChallan:
+      type: object
+      properties:
+        id:
+          type: string
+        challanNumber:
+          type: string
+          example: "CH-2026-0001"
+        customerId:
+          type: string
+        status:
+          type: string
+          enum: [DRAFT, CONFIRMED, CANCELLED]
+        totalQuantity:
+          type: integer
+        totalAmount:
+          type: string
+        items:
+          type: array
+
+security:
+  - bearerAuth: []
+
+paths:
+  /auth/login:
+    post:
+      summary: Login and get JWT token
+      tags: [Auth]
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [email, password]
+              properties:
+                email:
+                  type: string
+                  format: email
+                password:
+                  type: string
+      responses:
+        "200":
+          description: Login success - JWT token returned
+        "401":
+          description: Invalid credentials
+        "422":
+          description: Validation error
+        "429":
+          description: Too many login attempts
+
+  /auth/me:
+    get:
+      summary: Get current authenticated user
+      tags: [Auth]
+      responses:
+        "200":
+          description: Current user info
+        "401":
+          description: Unauthorized
+
+  /auth/logout:
+    post:
+      summary: Logout (stateless - client discards token)
+      tags: [Auth]
+      responses:
+        "200":
+          description: Logout acknowledged
+
+  /customers:
+    get:
+      summary: List customers
+      tags: [Customers]
+      parameters:
+        - name: page
+          in: query
+          schema: { type: integer, default: 1 }
+        - name: limit
+          in: query
+          schema: { type: integer, default: 20, maximum: 100 }
+        - name: q
+          in: query
+          schema: { type: string }
+          description: Search by name, mobile, businessName, or email
+        - name: status
+          in: query
+          schema: { type: string, enum: [LEAD, ACTIVE, INACTIVE] }
+        - name: customerType
+          in: query
+          schema: { type: string, enum: [RETAIL, WHOLESALE, DISTRIBUTOR] }
+      responses:
+        "200":
+          description: Paginated customer list
+        "403":
+          description: Warehouse role forbidden
+    post:
+      summary: Create a new customer
+      tags: [Customers]
+      description: "Roles: ADMIN, SALES"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [name, mobile, customerType, status]
+              properties:
+                name:
+                  type: string
+                mobile:
+                  type: string
+                email:
+                  type: string
+                businessName:
+                  type: string
+                gstNumber:
+                  type: string
+                customerType:
+                  type: string
+                  enum: [RETAIL, WHOLESALE, DISTRIBUTOR]
+                status:
+                  type: string
+                  enum: [LEAD, ACTIVE, INACTIVE]
+      responses:
+        "201":
+          description: Customer created
+        "409":
+          description: "DUPLICATE_MOBILE - mobile number already exists"
+        "422":
+          description: Validation error
+
+  /customers/{id}:
+    get:
+      summary: Get customer detail with notes and challan history
+      tags: [Customers]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        "200":
+          description: Customer detail
+        "404":
+          description: Customer not found
+    patch:
+      summary: Update customer (partial)
+      tags: [Customers]
+      description: "Roles: ADMIN, SALES"
+      responses:
+        "200":
+          description: Updated customer
+        "409":
+          description: Duplicate mobile
+
+  /customers/{id}/notes:
+    get:
+      summary: List follow-up notes for customer
+      tags: [Customers]
+      responses:
+        "200":
+          description: Notes list
+    post:
+      summary: Add a follow-up note
+      tags: [Customers]
+      description: "Roles: ADMIN, SALES"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [note]
+              properties:
+                note:
+                  type: string
+      responses:
+        "201":
+          description: Note created
+
+  /products:
+    get:
+      summary: List products
+      tags: [Products]
+      parameters:
+        - name: q
+          in: query
+          schema: { type: string }
+        - name: category
+          in: query
+          schema: { type: string }
+        - name: lowStock
+          in: query
+          schema: { type: boolean }
+      responses:
+        "200":
+          description: Paginated product list
+    post:
+      summary: Create a new product
+      tags: [Products]
+      description: "Roles: ADMIN, WAREHOUSE"
+      responses:
+        "201":
+          description: Product created
+        "409":
+          description: "DUPLICATE_SKU"
+
+  /products/low-stock:
+    get:
+      summary: Get all products below minimum stock alert threshold
+      tags: [Products]
+      responses:
+        "200":
+          description: Low stock product list
+
+  /products/{id}/stock-movements:
+    post:
+      summary: Log a manual stock movement (IN or OUT)
+      tags: [Products]
+      description: "Roles: ADMIN, WAREHOUSE"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [movementType, quantityChanged, reason]
+              properties:
+                movementType:
+                  type: string
+                  enum: [IN, OUT]
+                quantityChanged:
+                  type: integer
+                reason:
+                  type: string
+      responses:
+        "200":
+          description: Updated product with new stock
+        "400":
+          description: "INSUFFICIENT_STOCK - details include available count"
+
+  /challans:
+    get:
+      summary: List sales challans
+      tags: [Challans]
+      parameters:
+        - name: status
+          in: query
+          schema: { type: string, enum: [DRAFT, CONFIRMED, CANCELLED] }
+        - name: customerId
+          in: query
+          schema: { type: string }
+        - name: startDate
+          in: query
+          schema: { type: string }
+        - name: endDate
+          in: query
+          schema: { type: string }
+      responses:
+        "200":
+          description: Paginated challan list
+    post:
+      summary: Create a sales challan
+      tags: [Challans]
+      description: "Roles: ADMIN, SALES. Set status=CONFIRMED to confirm immediately."
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [customerId, items]
+              properties:
+                customerId:
+                  type: string
+                status:
+                  type: string
+                  enum: [DRAFT, CONFIRMED]
+                items:
+                  type: array
+                  items:
+                    type: object
+                    properties:
+                      productId:
+                        type: string
+                      quantity:
+                        type: integer
+      responses:
+        "201":
+          description: Challan created
+        "400":
+          description: "INSUFFICIENT_STOCK - details list short items"
+
+  /challans/{id}/confirm:
+    post:
+      summary: Confirm a DRAFT challan (triggers stock deduction)
+      tags: [Challans]
+      description: "Roles: ADMIN, SALES"
+      responses:
+        "200":
+          description: Challan confirmed
+        "400":
+          description: "INSUFFICIENT_STOCK"
+        "409":
+          description: "Challan not in DRAFT state"
+
+  /challans/{id}/cancel:
+    post:
+      summary: Cancel a challan (reverses stock if CONFIRMED)
+      tags: [Challans]
+      description: "Roles: ADMIN, SALES"
+      responses:
+        "200":
+          description: Challan cancelled
+        "409":
+          description: "Already cancelled"
+
+  /dashboard:
+    get:
+      summary: Get dashboard aggregate summary
+      tags: [Dashboard]
+      responses:
+        "200":
+          description: Aggregated counts, KPIs, and recent activity feed
+
+  /health:
+    get:
+      summary: Health check with DB connectivity
+      tags: [System]
+      security: []
+      responses:
+        "200":
+          description: System OK
+        "503":
+          description: Database unavailable

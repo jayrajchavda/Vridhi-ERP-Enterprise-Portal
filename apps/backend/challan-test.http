@@ -1,0 +1,97 @@
+### FULL CHALLAN LIFECYCLE TEST — Run in order
+
+### Step 1: Login as Sales to get token
+POST http://localhost:5000/api/v1/auth/login
+Content-Type: application/json
+
+{
+  "email": "sales@demo.com",
+  "password": "Passw0rd!"
+}
+
+###
+
+### Step 2: Create DRAFT Challan
+POST http://localhost:5000/api/v1/challans
+Authorization: Bearer <TOKEN>
+Content-Type: application/json
+
+{
+  "customerId": "<CUSTOMER_ID>",
+  "status": "DRAFT",
+  "items": [
+    { "productId": "<PRODUCT_ID_1>", "quantity": 3 },
+    { "productId": "<PRODUCT_ID_2>", "quantity": 2 }
+  ]
+}
+
+###
+
+### Step 3: List All Challans
+GET http://localhost:5000/api/v1/challans?page=1&limit=10&status=DRAFT
+Authorization: Bearer <TOKEN>
+
+###
+
+### Step 4: Get Challan Detail
+GET http://localhost:5000/api/v1/challans/<CHALLAN_ID>
+Authorization: Bearer <TOKEN>
+
+###
+
+### Step 5: Update Draft Challan (change items)
+PATCH http://localhost:5000/api/v1/challans/<CHALLAN_ID>
+Authorization: Bearer <TOKEN>
+Content-Type: application/json
+
+{
+  "items": [
+    { "productId": "<PRODUCT_ID_1>", "quantity": 5 }
+  ]
+}
+
+###
+
+### Step 6: Confirm Challan (triggers stock deduction)
+POST http://localhost:5000/api/v1/challans/<CHALLAN_ID>/confirm
+Authorization: Bearer <TOKEN>
+
+###
+
+### Step 7: Attempt Edit on Confirmed Challan — expect 409 CHALLAN_NOT_EDITABLE
+PATCH http://localhost:5000/api/v1/challans/<CHALLAN_ID>
+Authorization: Bearer <TOKEN>
+Content-Type: application/json
+
+{
+  "items": [
+    { "productId": "<PRODUCT_ID_1>", "quantity": 1 }
+  ]
+}
+
+###
+
+### Step 8: Cancel Confirmed Challan (reverses stock)
+POST http://localhost:5000/api/v1/challans/<CHALLAN_ID>/cancel
+Authorization: Bearer <TOKEN>
+
+###
+
+### Step 9: Verify Stock Restored — check product detail
+GET http://localhost:5000/api/v1/products/<PRODUCT_ID_1>
+Authorization: Bearer <TOKEN>
+
+###
+
+### Step 10: Test Insufficient Stock — confirm challan with quantity > available stock
+POST http://localhost:5000/api/v1/challans
+Authorization: Bearer <TOKEN>
+Content-Type: application/json
+
+{
+  "customerId": "<CUSTOMER_ID>",
+  "status": "CONFIRMED",
+  "items": [
+    { "productId": "<LOW_STOCK_PRODUCT_ID>", "quantity": 9999 }
+  ]
+}

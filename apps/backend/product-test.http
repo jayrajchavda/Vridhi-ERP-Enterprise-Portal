@@ -1,0 +1,77 @@
+### 1. List Products (Paginated, Searchable, Filterable)
+GET http://localhost:5000/api/v1/products?page=1&limit=10&sortBy=createdAt&order=desc
+Authorization: Bearer <TOKEN>
+
+### 2. Search Products by Keyword (matches name, SKU, category)
+GET http://localhost:5000/api/v1/products?q=DRILL
+Authorization: Bearer <TOKEN>
+
+### 3. Get Low Stock Alert Products (currentStock <= minStockAlert)
+GET http://localhost:5000/api/v1/products/low-stock
+Authorization: Bearer <TOKEN>
+
+### 4. Create New Product
+POST http://localhost:5000/api/v1/products
+Authorization: Bearer <TOKEN>
+Content-Type: application/json
+
+{
+  "name": "Cordless Screwdriver 12V",
+  "sku": "SCREWDRIVE-12V",
+  "category": "Power Tools",
+  "unitPrice": 1850.00,
+  "currentStock": 30,
+  "minStockAlert": 5,
+  "location": "Aisle 4 - Shelf A"
+}
+
+### 5. Get Product Detail with Movement History
+GET http://localhost:5000/api/v1/products/<PRODUCT_ID>
+Authorization: Bearer <TOKEN>
+
+### 6. Update Product (PATCH)
+PATCH http://localhost:5000/api/v1/products/<PRODUCT_ID>
+Authorization: Bearer <TOKEN>
+Content-Type: application/json
+
+{
+  "unitPrice": 1950.00,
+  "minStockAlert": 10
+}
+
+### 7. Log Stock IN Movement (+50 stock)
+POST http://localhost:5000/api/v1/products/<PRODUCT_ID>/stock-movements
+Authorization: Bearer <TOKEN>
+Content-Type: application/json
+
+{
+  "movementType": "IN",
+  "quantityChanged": 50,
+  "reason": "New shipment received from supplier invoice #SUP-2026-88"
+}
+
+### 8. Log Stock OUT Movement (-10 stock)
+POST http://localhost:5000/api/v1/products/<PRODUCT_ID>/stock-movements
+Authorization: Bearer <TOKEN>
+Content-Type: application/json
+
+{
+  "movementType": "OUT",
+  "quantityChanged": 10,
+  "reason": "Damaged goods stock adjustment"
+}
+
+### 9. Test Insufficient Stock OUT Movement (Attempt to remove 9999 units)
+POST http://localhost:5000/api/v1/products/<PRODUCT_ID>/stock-movements
+Authorization: Bearer <TOKEN>
+Content-Type: application/json
+
+{
+  "movementType": "OUT",
+  "quantityChanged": 9999,
+  "reason": "Excessive deduction test"
+}
+
+### 10. Get Stock Movement History for Product
+GET http://localhost:5000/api/v1/products/<PRODUCT_ID>/stock-movements
+Authorization: Bearer <TOKEN>

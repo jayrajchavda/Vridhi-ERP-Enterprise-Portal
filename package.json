@@ -1,0 +1,21 @@
+{
+  "name": "mini-erp-crm",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Mini ERP + CRM Operations Portal Monorepo",
+  "workspaces": [
+    "apps/backend",
+    "apps/frontend"
+  ],
+  "scripts": {
+    "dev": "concurrently -k -p \"[{name}]\" -c \"blue.bold,green.bold\" \"npm run dev --workspace=apps/backend\" \"npm run dev --workspace=apps/frontend\"",
+    "build": "npm run build --workspace=apps/backend && npm run build --workspace=apps/frontend",
+    "start": "npm run start --workspace=apps/backend",
+    "lint": "npm run lint --workspace=apps/backend && npm run lint --workspace=apps/frontend",
+    "format": "npm run format --workspace=apps/backend && npm run format --workspace=apps/frontend",
+    "test": "npm run test --workspace=apps/backend && npm run test --workspace=apps/frontend"
+  },
+  "devDependencies": {
+    "concurrently": "^8.2.2"
+  }
+}
